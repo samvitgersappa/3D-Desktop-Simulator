@@ -25,7 +25,7 @@ void processSpecialKeys(int key, int xx, int yy)
 		if (now - lastStepMs < 180)
 			return;
 		lastStepMs = now;
-		audio::play_ui("data/sfx/step.wav", 0.35f);
+		audio::play_step("data/sfx/step.wav", 0.35f);
 	};
 
 	switch (key) {
@@ -76,6 +76,15 @@ void processSpecialKeys(int key, int xx, int yy)
 
 void processNormalKeys(unsigned char key, int x, int y)
 {
+	static int lastActionMs = 0;
+	auto allowAction = [&]() {
+		int now = glutGet(GLUT_ELAPSED_TIME);
+		if (now - lastActionMs < 180)
+			return false;
+		lastActionMs = now;
+		return true;
+	};
+
 	switch (key) {
 	case 13:if (page == 0) 
 				motion_present = true;
@@ -83,7 +92,8 @@ void processNormalKeys(unsigned char key, int x, int y)
 				enterPressed = true;
 				assemble = false;
 				objIndex > REMOVE_MOTHERBOARD? objIndex:objIndex++;
-				audio::play3d("data/sfx/disassemble.wav", {2.0f, 1.0f, -2.0f}, 0.9f);
+				if (allowAction())
+					audio::play3d("data/sfx/disassemble.wav", {2.0f, 1.0f, -2.0f}, 0.9f, audio::Channel::ACTION);
 			}
 			else {
 				audio::play_ui("data/sfx/enter.wav", 0.7f);
@@ -94,7 +104,8 @@ void processNormalKeys(unsigned char key, int x, int y)
 			enterPressed = true;
 			assemble = true;
 			objIndex < -1 ? objIndex : objIndex--;
-			audio::play3d("data/sfx/assemble.wav", {2.0f, 1.0f, -2.0f}, 0.9f);
+			if (allowAction())
+				audio::play3d("data/sfx/assemble.wav", {2.0f, 1.0f, -2.0f}, 0.9f, audio::Channel::ACTION);
 		   }
 		   break;
 	case 'y':
@@ -105,6 +116,8 @@ void processNormalKeys(unsigned char key, int x, int y)
 	case 27:escape_pressed = true;
 			audio::play_ui("data/sfx/ui_click.wav", 0.5f);
 			if (!motion_present && choice == 'y') {
+				// Exiting disassembly view.
+				audio::stop(audio::Channel::ACTION);
 				motion_present = true;
 			}
 			else
@@ -212,6 +225,7 @@ void cpuView() {
 		choice = '1';
 		enterPressed = false;
 		escape_pressed = false;
+		audio::stop(audio::Channel::ACTION);
 	}
 }
 #endif MOTION

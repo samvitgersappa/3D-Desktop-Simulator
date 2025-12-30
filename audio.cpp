@@ -2,8 +2,10 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <iostream>
+#include <unordered_set>
 #include <unordered_map>
 #include <vector>
 
@@ -29,8 +31,13 @@ static bool g_inited = false;
 static ALCdevice* g_device = nullptr;
 static ALCcontext* g_context = nullptr;
 static std::unordered_map<std::string, ALuint> g_bufferCache;
+static std::unordered_set<std::string> g_missingSounds;
 static std::vector<ALuint> g_sources;
 static Vec3 g_listenerPos{0, 0, 0};
+
+static ALuint g_uiSource = 0;
+static ALuint g_stepSource = 0;
+static ALuint g_actionSource = 0;
 
 static float len(Vec3 v) {
 	return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
@@ -75,6 +82,7 @@ static bool load_wav_file(const std::string& path, WavData& wav) {
 	bool haveFmt = false;
 	bool haveData = false;
 	std::uint16_t audioFormat = 0;
+	std::vector<std::uint8_t> rawData;
 
 	while (in && !(haveFmt && haveData)) {
 		char chunkId[4]{};
@@ -108,8 +116,8 @@ static bool load_wav_file(const std::string& path, WavData& wav) {
 			wav.bitsPerSample = (int)bitsPerSample;
 			haveFmt = true;
 		} else if (id == "data") {
-			wav.pcm.resize(chunkSize);
-			if (!in.read(reinterpret_cast<char*>(wav.pcm.data()), chunkSize)) return false;
+			rawData.resize(chunkSize);
+			if (!in.read(reinterpret_cast<char*>(rawData.data()), chunkSize)) return false;
 			haveData = true;
 		} else {
 			in.seekg(chunkSize, std::ios::cur);
@@ -120,10 +128,81 @@ static bool load_wav_file(const std::string& path, WavData& wav) {
 	}
 
 	if (!haveFmt || !haveData) return false;
-	if (audioFormat != 1) return false; // PCM only
 	if (!((wav.channels == 1) || (wav.channels == 2))) return false;
-	if (!((wav.bitsPerSample == 8) || (wav.bitsPerSample == 16))) return false;
-	return true;
+	if (!((audioFormat == 1) || (audioFormat == 3))) return false; // 1=PCM, 3=IEEE float
+	if (!((wav.bitsPerSample == 8) || (wav.bitsPerSample == 16) || (wav.bitsPerSample == 24) || (wav.bitsPerSample == 32))) return false;
+
+	// Convert uncommon formats to 16-bit PCM for reliable OpenAL upload.
+	if (wav.bitsPerSample == 8) {
+		wav.pcm = std::move(rawData);
+		return true;
+	}
+
+	if (wav.bitsPerSample == 16 && audioFormat == 1) {
+		wav.pcm = std::move(rawData);
+		return true;
+	}
+
+	// Convert to signed 16-bit little-endian.
+	std::vector<std::uint8_t> out;
+	out.reserve((rawData.size() / (wav.bitsPerSample / 8)) * 2);
+
+	auto push_i16_le = [&](std::int16_t s) {
+		out.push_back((std::uint8_t)(s & 0xFF));
+		out.push_back((std::uint8_t)((s >> 8) & 0xFF));
+	};
+
+	if (audioFormat == 3 && wav.bitsPerSample == 32) {
+		// IEEE float32 [-1,1] -> int16
+		for (size_t i = 0; i + 3 < rawData.size(); i += 4) {
+			float f = 0.0f;
+			std::memcpy(&f, rawData.data() + i, 4);
+			if (f > 1.0f) f = 1.0f;
+			if (f < -1.0f) f = -1.0f;
+			int v = (int)std::lround(f * 32767.0f);
+			if (v > 32767) v = 32767;
+			if (v < -32768) v = -32768;
+			push_i16_le((std::int16_t)v);
+		}
+		wav.pcm = std::move(out);
+		wav.bitsPerSample = 16;
+		return true;
+	}
+
+	if (audioFormat == 1 && wav.bitsPerSample == 24) {
+		// Signed 24-bit PCM -> int16 (drop lowest 8 bits)
+		for (size_t i = 0; i + 2 < rawData.size(); i += 3) {
+			int v = (int)rawData[i] | ((int)rawData[i + 1] << 8) | ((int)rawData[i + 2] << 16);
+			// sign extend 24-bit
+			if (v & 0x800000) v |= ~0xFFFFFF;
+			v >>= 8;
+			if (v > 32767) v = 32767;
+			if (v < -32768) v = -32768;
+			push_i16_le((std::int16_t)v);
+		}
+		wav.pcm = std::move(out);
+		wav.bitsPerSample = 16;
+		return true;
+	}
+
+	if (audioFormat == 1 && wav.bitsPerSample == 32) {
+		// Signed 32-bit PCM -> int16 (drop lowest 16 bits)
+		for (size_t i = 0; i + 3 < rawData.size(); i += 4) {
+			std::int32_t v = (std::int32_t)((std::uint32_t)rawData[i] |
+				((std::uint32_t)rawData[i + 1] << 8) |
+				((std::uint32_t)rawData[i + 2] << 16) |
+				((std::uint32_t)rawData[i + 3] << 24));
+			v >>= 16;
+			if (v > 32767) v = 32767;
+			if (v < -32768) v = -32768;
+			push_i16_le((std::int16_t)v);
+		}
+		wav.pcm = std::move(out);
+		wav.bitsPerSample = 16;
+		return true;
+	}
+
+	return false;
 }
 
 static ALenum to_al_format(const WavData& wav) {
@@ -135,18 +214,23 @@ static ALenum to_al_format(const WavData& wav) {
 }
 
 static ALuint get_buffer(const std::string& soundPath) {
+	if (g_missingSounds.find(soundPath) != g_missingSounds.end())
+		return 0;
+
 	auto it = g_bufferCache.find(soundPath);
 	if (it != g_bufferCache.end()) return it->second;
 
 	WavData wav;
 	if (!load_wav_file(soundPath, wav)) {
 		std::cerr << "[audio] Failed to load WAV: " << soundPath << "\n";
+		g_missingSounds.insert(soundPath);
 		return 0;
 	}
 
 	ALenum format = to_al_format(wav);
 	if (format == 0) {
 		std::cerr << "[audio] Unsupported WAV format: " << soundPath << "\n";
+		g_missingSounds.insert(soundPath);
 		return 0;
 	}
 
@@ -158,6 +242,7 @@ static ALuint get_buffer(const std::string& soundPath) {
 	if (err != AL_NO_ERROR) {
 		std::cerr << "[audio] OpenAL error loading buffer: " << soundPath << "\n";
 		if (buffer) alDeleteBuffers(1, &buffer);
+		g_missingSounds.insert(soundPath);
 		return 0;
 	}
 
@@ -177,6 +262,15 @@ static ALuint acquire_source() {
 	if (!src) return 0;
 	g_sources.push_back(src);
 	return src;
+}
+
+static ALuint channel_source(Channel channel) {
+	switch (channel) {
+	case Channel::UI: return g_uiSource;
+	case Channel::STEP: return g_stepSource;
+	case Channel::ACTION: return g_actionSource;
+	default: return g_actionSource;
+	}
 }
 #endif
 
@@ -210,6 +304,15 @@ bool init() {
 	// Reasonable defaults for 3D.
 	alDistanceModel(AL_INVERSE_DISTANCE_CLAMPED);
 	alListenerf(AL_GAIN, 1.0f);
+
+	// Dedicated channels so common sounds don't overlap.
+	alGenSources(1, &g_uiSource);
+	alGenSources(1, &g_stepSource);
+	alGenSources(1, &g_actionSource);
+	g_sources.push_back(g_uiSource);
+	g_sources.push_back(g_stepSource);
+	g_sources.push_back(g_actionSource);
+
 	g_inited = true;
 	return true;
 #else
@@ -226,12 +329,16 @@ void shutdown() {
 		alDeleteSources(1, &src);
 	}
 	g_sources.clear();
+	g_uiSource = 0;
+	g_stepSource = 0;
+	g_actionSource = 0;
 
 	for (auto& kv : g_bufferCache) {
 		ALuint buf = kv.second;
 		if (buf) alDeleteBuffers(1, &buf);
 	}
 	g_bufferCache.clear();
+	g_missingSounds.clear();
 
 	alcMakeContextCurrent(nullptr);
 	if (g_context) alcDestroyContext(g_context);
@@ -267,14 +374,14 @@ void update_listener(Vec3 position, Vec3 forward, Vec3 up) {
 #endif
 }
 
-void play3d(const std::string& soundPath, Vec3 position, float gain) {
+void play3d(const std::string& soundPath, Vec3 position, float gain, Channel channel) {
 #ifdef USE_OPENAL
 	if (!g_inited) return;
 
 	ALuint buffer = get_buffer(soundPath);
 	if (!buffer) return;
 
-	ALuint src = acquire_source();
+	ALuint src = channel_source(channel);
 	if (!src) return;
 
 	alSourceStop(src);
@@ -297,7 +404,47 @@ void play3d(const std::string& soundPath, Vec3 position, float gain) {
 
 void play_ui(const std::string& soundPath, float gain) {
 #ifdef USE_OPENAL
-	play3d(soundPath, g_listenerPos, gain);
+	if (!g_inited) return;
+	ALuint buffer = get_buffer(soundPath);
+	if (!buffer) return;
+	ALuint src = channel_source(Channel::UI);
+	if (!src) return;
+
+	alSourceStop(src);
+	alSourcei(src, AL_BUFFER, (ALint)buffer);
+	alSourcef(src, AL_GAIN, gain);
+	alSourcef(src, AL_PITCH, 1.0f);
+	alSourcei(src, AL_LOOPING, AL_FALSE);
+
+	// UI sounds: not spatial (relative to listener).
+	alSourcei(src, AL_SOURCE_RELATIVE, AL_TRUE);
+	alSource3f(src, AL_POSITION, 0.0f, 0.0f, 0.0f);
+	alSource3f(src, AL_VELOCITY, 0.0f, 0.0f, 0.0f);
+
+	alSourcePlay(src);
+#endif
+}
+
+void play_step(const std::string& soundPath, float gain) {
+#ifdef USE_OPENAL
+	play3d(soundPath, g_listenerPos, gain, Channel::STEP);
+#endif
+}
+
+void stop(Channel channel) {
+#ifdef USE_OPENAL
+	if (!g_inited) return;
+	ALuint src = channel_source(channel);
+	if (src) alSourceStop(src);
+#endif
+}
+
+void stop_all() {
+#ifdef USE_OPENAL
+	if (!g_inited) return;
+	for (ALuint src : g_sources) {
+		if (src) alSourceStop(src);
+	}
 #endif
 }
 
