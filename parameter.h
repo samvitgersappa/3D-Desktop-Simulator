@@ -24,6 +24,7 @@ public:
 // WINDOW & PAGE PARAMETERS
 int width = 1920, hight = 1080;
 int page = 0;
+int mouseGlobalX = 0, mouseGlobalY = 0;
 
 // MOTION PARAMETERS
 #define UPPER_Y 7.0

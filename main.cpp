@@ -15,6 +15,9 @@ adarshrevankar0123@gmail.com
 #include "audio.h"
 #include "bitmap.h"
 #include "light.h"
+#include "tooltip.h"
+
+TooltipSystem tooltipSystem;
 #include "motion.h"
 #include "objects.h"
 #include "parameter.h"
@@ -72,11 +75,43 @@ void renderScene() {
                          {(float)lx, (float)(y - 5.0), (float)lz},
                          {0.0f, 1.0f, 0.0f});
 
+  // Update and Draw Tooltips (AR Overlay)
+  // Update and Draw Tooltips (AR Overlay)
+  tooltipSystem.update(mouseGlobalX, mouseGlobalY);
+
   if (page == 1) {
     drawGround();
     drawCube();
     cpuView();
     drawCPU();
+
+    // Update dynamic positions
+    point3D gpuOff = gpu_.getOffset();
+    tooltipSystem.updateComponent("NVIDIA GTX Graphics", 7.55f + gpuOff.x,
+                                  4.2f + gpuOff.y, -4.65f + gpuOff.z);
+
+    point3D fanOff = fan_.getOffset();
+    tooltipSystem.updateComponent("CPU Cooling Unit", 8.72f + fanOff.x,
+                                  4.32f + fanOff.y, -3.82f + fanOff.z);
+
+    point3D ramOff = ram_.getOffset();
+    // RAM renders in 3 spots, we track the main one or the one that moves first
+    tooltipSystem.updateComponent("DDR4 RAM", 8.0f + ramOff.x, 4.8f + ramOff.y,
+                                  -4.3f + ramOff.z);
+
+    point3D psuOff = psu_.getOffset();
+    tooltipSystem.updateComponent("Power Supply", 8.0f + psuOff.x,
+                                  3.4f + psuOff.y, -4.79f + psuOff.z);
+
+    point3D hddOff = harddisk_.getOffset();
+    // HDD has scale factor 0.4, base pos was translated by 1/scale.
+    // The render function: glScalef(0.4...); glTranslatef(8./0.4, 3.86/0.4,
+    // -3.2/0.4); So world position is (8.0, 3.86, -3.2) + offset.
+    tooltipSystem.updateComponent("Hard Disk", 8.0f + hddOff.x,
+                                  3.86f + hddOff.y, -3.2f + hddOff.z);
+
+    // Draw tooltips on top of the CPU view
+    tooltipSystem.draw((float)x, 5.0f, (float)z);
   } else if (page == 0) {
     front_page();
     progress_wheel();
@@ -91,13 +126,28 @@ void opengl_init(void) {
     audio::preload_defaults();
     std::atexit(audio::shutdown);
   }
+
+  // Register AR Tooltips
+  // Positions derived from cpu_gpu.h, cpu_fan.h, etc.
+  tooltipSystem.registerComponent("NVIDIA GTX Graphics", "High performance GPU",
+                                  7.55f, 4.2f, -4.65f, 0.6f);
+  tooltipSystem.registerComponent("CPU Cooling Unit", "Spinning at 2000 RPM",
+                                  8.72f, 4.32f, -3.82f, 0.5f);
+  tooltipSystem.registerComponent("DDR4 RAM", "16GB 3200MHz", 8.0f, 4.8f, -4.3f,
+                                  0.4f);
+  // New Components
+  tooltipSystem.registerComponent("Power Supply", "750W Gold Rated", 8.0f, 3.4f,
+                                  -4.79f, 0.6f);
+  tooltipSystem.registerComponent("Hard Disk", "2TB Mechanical Storage", 8.0f,
+                                  3.86f, -3.2f, 0.5f);
+
   textureInit();
   glutDisplayFunc(renderScene);
   glutIdleFunc(renderScene);
   glutReshapeFunc(change_size);
   glutKeyboardFunc(processNormalKeys);
   glutSpecialFunc(processSpecialKeys);
-  glutPassiveMotionFunc(mouse_follow);
+  glutPassiveMotionFunc(mouse_follow); // Track mouse when button IS NOT pressed
   show_light_effect();
 }
 

@@ -2,6 +2,7 @@
 #define CPU_CABLE
 
 #include "gl_includes.h"
+#include "parameter.h"
 
 class cable {
   bool visible = true;
