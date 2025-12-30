@@ -52,6 +52,8 @@
 		<Unit filename="env_table.h" />
 		<Unit filename="environment_objects.h" />
 		<Unit filename="light.h" />
+		<Unit filename="audio.cpp" />
+		<Unit filename="audio.h" />
 		<Unit filename="main.cpp" />
 		<Unit filename="motion.h" />
 		<Unit filename="objects.h" />

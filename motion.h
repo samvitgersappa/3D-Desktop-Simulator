@@ -3,6 +3,7 @@
 
 #include "parameter.h"
 #include "objects.h"
+#include "audio.h"
 
 
 int prev_x = 0, prev_y = 0;
@@ -13,39 +14,56 @@ void processSpecialKeys(int key, int xx, int yy)
 {
 	float fraction = 0.001f;
 	float fraction_rotate = 0.001f;
+	static int lastStepMs = 0;
 	
 	if (!motion_present)
 		return;
+
+	auto maybeStep = [&]() {
+		// Avoid spamming on key repeat.
+		int now = glutGet(GLUT_ELAPSED_TIME);
+		if (now - lastStepMs < 180)
+			return;
+		lastStepMs = now;
+		audio::play_ui("data/sfx/step.wav", 0.35f);
+	};
+
 	switch (key) {
 	case GLUT_KEY_LEFT:
 		x -= cos(angle) * deltaTime * fraction;
 		z -= sin(angle) * deltaTime * fraction;
+		maybeStep();
 		break;
 	case GLUT_KEY_RIGHT:
 		x += cos(angle) * deltaTime * fraction;
 		z += sin(angle) * deltaTime * fraction;
+		maybeStep();
 
 		break;
 	case GLUT_KEY_UP:
 
 		x += lx * deltaTime * fraction;
 		z += lz * deltaTime * fraction;
+		maybeStep();
 
 		break;
 	case GLUT_KEY_DOWN:
 		x -= lx * deltaTime * fraction;
 		z -= lz * deltaTime * fraction;
+		maybeStep();
 
 		break;
 	case GLUT_KEY_HOME:
 		angle -= deltaTime * fraction_rotate;
 		lx = sin(angle);
 		lz = -cos(angle);
+		audio::play_ui("data/sfx/ui_click.wav", 0.25f);
 		break;
 	case GLUT_KEY_END:
 		angle += deltaTime * fraction_rotate;
 		lx = sin(angle);
 		lz = -cos(angle);
+		audio::play_ui("data/sfx/ui_click.wav", 0.25f);
 		break;
 	case GLUT_KEY_PAGE_UP:
 		y < 1.4f ? y += deltaTime * fraction_rotate * 0.5 : y = 1.4f;
@@ -65,13 +83,18 @@ void processNormalKeys(unsigned char key, int x, int y)
 				enterPressed = true;
 				assemble = false;
 				objIndex > REMOVE_MOTHERBOARD? objIndex:objIndex++;
+				audio::play3d("data/sfx/disassemble.wav", {2.0f, 1.0f, -2.0f}, 0.9f);
 			}
-			 page = 1;			 
+			else {
+				audio::play_ui("data/sfx/enter.wav", 0.7f);
+			}
+			page = 1;			 
 			 break;
 	case 8:if (page == 1) {
 			enterPressed = true;
 			assemble = true;
 			objIndex < -1 ? objIndex : objIndex--;
+			audio::play3d("data/sfx/assemble.wav", {2.0f, 1.0f, -2.0f}, 0.9f);
 		   }
 		   break;
 	case 'y':
@@ -80,6 +103,7 @@ void processNormalKeys(unsigned char key, int x, int y)
 	case 'n':
 	case 'N':choice = 'n'; break;
 	case 27:escape_pressed = true;
+			audio::play_ui("data/sfx/ui_click.wav", 0.5f);
 			if (!motion_present && choice == 'y') {
 				motion_present = true;
 			}

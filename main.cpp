@@ -9,12 +9,14 @@ Any improvements made will be accepted, mail the code to : adarshrevankar0123@gm
 */
 #include <GL/glut.h>
 #include <iostream>
+#include <cstdlib>
 
 #include "parameter.h"
 #include "motion.h"
 #include "objects.h"
 #include "bitmap.h"
 #include "light.h"
+#include "audio.h"
 
 /* TEXTURE HANDLING */
 void loadTexture(GLuint texture, const char* filename) {
@@ -65,6 +67,13 @@ void renderScene()
 		x + lx, y, z + lz,
 		0.0f, 1.0f, 0.0f);
 
+	// 3D audio listener follows the camera.
+	audio::update_listener(
+		{(float)x, 5.0f, (float)z},
+		{(float)lx, (float)(y - 5.0), (float)lz},
+		{0.0f, 1.0f, 0.0f}
+	);
+
 	if (page == 1) {
 		drawGround();
 		drawCube();
@@ -80,6 +89,11 @@ void renderScene()
 
 void opengl_init(void) {
 	glEnable(GL_DEPTH_TEST);
+	// Optional 3D audio (enabled when built with USE_OPENAL).
+	if (audio::init()) {
+		audio::preload_defaults();
+		std::atexit(audio::shutdown);
+	}
 	textureInit();
 	glutDisplayFunc(renderScene);
 	glutIdleFunc(renderScene);
@@ -106,6 +120,7 @@ int main(int argc, char ** argv) {
 	glutFullScreen();
 	setDeltaTime();
 	glutMainLoop();
+	audio::shutdown();
 	getchar();
 	return 0;
 }

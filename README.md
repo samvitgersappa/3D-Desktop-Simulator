@@ -76,6 +76,35 @@ Desktop View | <img src="https://user-images.githubusercontent.com/48080453/6019
   - (optional) IDE ( *Visual Studio / CodeBlocks* )\*
   - basic C++ Libraries
   - glut.h ( freeglut )
+
+---
+
+## Optional: Interactive 3D Sound (OpenAL)
+
+This repo includes an optional 3D audio module (OpenAL). It is **disabled by default** so the project still builds without extra dependencies.
+
+### 1) Add sound files
+Create/keep these files (16-bit PCM `.wav` recommended):
+
+- `data/sfx/ui_click.wav`
+- `data/sfx/enter.wav`
+- `data/sfx/disassemble.wav`
+- `data/sfx/assemble.wav`
+- `data/sfx/step.wav`
+
+If a file is missing, the program will just skip that sound.
+
+### 2) Install OpenAL Soft
+Install OpenAL Soft (provides `AL/al.h`, `AL/alc.h` and `OpenAL32.dll` / `libopenal32.a`).
+
+### 3) Enable it in the build
+Define `USE_OPENAL` and link OpenAL:
+
+- Add compiler define: `USE_OPENAL`
+- Link library: `openal32` (or `OpenAL32` depending on your toolchain)
+- Ensure `OpenAL32.dll` is next to your built `.exe` when you run.
+
+On Code::Blocks (MinGW): add OpenAL include/lib folders in build settings, then add the linker library.
     
 ---
 
