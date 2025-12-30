@@ -1,3 +1,17 @@
-# file(s) without an extension
-!*.*
-main
+# Binaries
+DesktopSimulation
+DesktopSimulator
+*.exe
+*.o
+*.out
+
+# Object files and build directories
+obj/
+bin/
+
+# IDE files
+.DS_Store
+.vscode/
+.idea/
+*.depend
+*.layout

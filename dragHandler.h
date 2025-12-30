@@ -1,22 +1,22 @@
-//#ifndef DRAG_HANDLER
-//#define DRAG_HANDLER
-//#include <GL/glut.h>
-//#include <math.h>
-//#include "parameter.h"
+// #ifndef DRAG_HANDLER
+// #define DRAG_HANDLER
+// #include "gl_includes.h"
+// #include <math.h>
+// #include "parameter.h"
 //
-//class dragHandler {
-//private:double matModelView[16], matProjection[16];
+// class dragHandler {
+// private:double matModelView[16], matProjection[16];
 //		int viewport[4];
 //		point2D winCoord;
-//		
+//
 //		void init(double, double);
-//public:	point3D start, end; 
+// public:	point3D start, end;
 //		point3D objCenter;
 //		double calcDistance();
-//};
+// };
 //
-//void dragHandler::init(double mx, double my) 
-//{	
+// void dragHandler::init(double mx, double my)
+//{
 //	// Mouse point init
 //	point2D mousePoint;
 //	mousePoint.assign(mx, my);
@@ -35,14 +35,14 @@
 //	/// Get the values from gluProjection
 //	float nearPlane = 0.7, farPlane = 100.0;
 //	/// start points
-//	gluUnProject(winCoord.x, winCoord.y, nearPlane, matModelView, matProjection,
-//		viewport, &start.x, &start.y, &start.z);
+//	gluUnProject(winCoord.x, winCoord.y, nearPlane, matModelView,
+//matProjection, 		viewport, &start.x, &start.y, &start.z);
 //	/// end points
-//	gluUnProject(winCoord.x, winCoord.y, farPlane, matModelView, matProjection,
-//		viewport, &end.x, &end.y, &end.z);
-//}
+//	gluUnProject(winCoord.x, winCoord.y, farPlane, matModelView,
+//matProjection, 		viewport, &end.x, &end.y, &end.z);
+// }
 //
-//double dragHandler::calcDistance( ) {
+// double dragHandler::calcDistance( ) {
 //	// Distance between point and line
 //	point3D AB, AP, objPos;
 //
@@ -60,15 +60,17 @@
 //
 //	double ab_dot_ap = AP.x * AB.x + AP.y * AB.y + AP.z + AB.z;
 //
-//	double t = ab_dot_ab_sqr / ab_dot_ap;				/// T = AB / AP
-//	
-//	objPos.x = start.x + AB.x* t; /// Perpendicular Point = A + AB * T 
+//	double t = ab_dot_ab_sqr / ab_dot_ap;				/// T =
+//AB / AP
+//
+//	objPos.x = start.x + AB.x* t; /// Perpendicular Point = A + AB * T
 //	objPos.y = start.y+ AB.y* t;
 //	objPos.z = start.z+ AB.z* t;
 //
 //	objCenter.assign(objPos.x, objPos.y, objPos.z);
 //
-//	return sqrt(pow(objPos.x - x, 2) * pow(objPos.y - y, 2) * pow(objPos.z - z, 2));
-//}
+//	return sqrt(pow(objPos.x - x, 2) * pow(objPos.y - y, 2) * pow(objPos.z -
+//z, 2));
+// }
 //
-//#endif DRAG_HANDLER
+// #endif DRAG_HANDLER
