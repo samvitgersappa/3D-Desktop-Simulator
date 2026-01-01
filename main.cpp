@@ -85,30 +85,33 @@ void renderScene() {
     cpuView();
     drawCPU();
 
-    // Update dynamic positions
+    // Update dynamic positions and visibility based on offset
     point3D gpuOff = gpu_.getOffset();
     tooltipSystem.updateComponent("NVIDIA GTX Graphics", 7.55f + gpuOff.x,
-                                  4.2f + gpuOff.y, -4.65f + gpuOff.z);
+                                  4.2f + gpuOff.y, -4.65f + gpuOff.z, gpuOff.x);
 
     point3D fanOff = fan_.getOffset();
-    tooltipSystem.updateComponent("CPU Cooling Unit", 8.72f + fanOff.x,
-                                  4.32f + fanOff.y, -3.82f + fanOff.z);
+    // Fan position: glTranslatef(-0.974, .52, -0.745) +
+    // glTranslatef(8.72, 4.321, -3.821) = (7.746, 4.841, -4.566)
+    tooltipSystem.updateComponent("CPU Cooling Unit", 7.746f + fanOff.x,
+                                  4.841f + fanOff.y, -4.566f + fanOff.z,
+                                  fanOff.x);
 
     point3D ramOff = ram_.getOffset();
     // RAM renders in 3 spots, we track the main one or the one that moves first
     tooltipSystem.updateComponent("DDR4 RAM", 8.0f + ramOff.x, 4.8f + ramOff.y,
-                                  -4.3f + ramOff.z);
+                                  -4.3f + ramOff.z, ramOff.x);
 
     point3D psuOff = psu_.getOffset();
     tooltipSystem.updateComponent("Power Supply", 8.0f + psuOff.x,
-                                  3.4f + psuOff.y, -4.79f + psuOff.z);
+                                  3.4f + psuOff.y, -4.79f + psuOff.z, psuOff.x);
 
     point3D hddOff = harddisk_.getOffset();
     // HDD has scale factor 0.4, base pos was translated by 1/scale.
     // The render function: glScalef(0.4...); glTranslatef(8./0.4, 3.86/0.4,
     // -3.2/0.4); So world position is (8.0, 3.86, -3.2) + offset.
     tooltipSystem.updateComponent("Hard Disk", 8.0f + hddOff.x,
-                                  3.86f + hddOff.y, -3.2f + hddOff.z);
+                                  3.86f + hddOff.y, -3.2f + hddOff.z, hddOff.x);
 
     // Draw tooltips on top of the CPU view
     tooltipSystem.draw((float)x, 5.0f, (float)z);
@@ -131,8 +134,10 @@ void opengl_init(void) {
   // Positions derived from cpu_gpu.h, cpu_fan.h, etc.
   tooltipSystem.registerComponent("NVIDIA GTX Graphics", "High performance GPU",
                                   7.55f, 4.2f, -4.65f, 0.6f);
+  // Fan position: (-0.974 + 8.72, 0.52 + 4.321, -0.745 + -3.821) =
+  // (7.746, 4.841, -4.566)
   tooltipSystem.registerComponent("CPU Cooling Unit", "Spinning at 2000 RPM",
-                                  8.72f, 4.32f, -3.82f, 0.5f);
+                                  7.746f, 4.841f, -4.566f, 0.5f);
   tooltipSystem.registerComponent("DDR4 RAM", "16GB 3200MHz", 8.0f, 4.8f, -4.3f,
                                   0.4f);
   // New Components
