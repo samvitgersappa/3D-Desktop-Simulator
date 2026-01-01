@@ -20,6 +20,9 @@ struct ComponentInfo {
   float hoverTime; // Track how long component has been hovered
   bool isVisible;  // Whether the component is visible (not disassembled out of
                    // view)
+  std::string blockedBy; // Name of component that blocks this one's label
+                         // (empty = not blocked)
+  bool blockerRemoved;   // Whether the blocking component has been removed
 };
 
 class TooltipSystem {
@@ -204,8 +207,10 @@ private:
 
 public:
   void registerComponent(std::string name, std::string description, float x,
-                         float y, float z, float radius = 0.5f) {
-    components.push_back({name, description, x, y, z, radius, 0.0f, true});
+                         float y, float z, float radius = 0.5f,
+                         std::string blockedBy = "") {
+    components.push_back(
+        {name, description, x, y, z, radius, 0.0f, true, blockedBy, false});
   }
 
   // Dynamic update for moving parts - this keeps tooltip synced with component
@@ -213,6 +218,8 @@ public:
   // outside the case
   void updateComponent(std::string name, float x, float y, float z,
                        float offsetX = 0.0f) {
+    bool componentRemoved = (offsetX < -3.5f); // Component fully disassembled
+
     for (auto &c : components) {
       if (c.name == name) {
         c.x = x;
@@ -222,7 +229,10 @@ public:
         // (disassembled) Components move in negative X direction when
         // disassembling
         c.isVisible = (offsetX > -1.5f);
-        return;
+      }
+      // If this component was blocking others, mark them as unblocked
+      if (componentRemoved && c.blockedBy == name) {
+        c.blockerRemoved = true;
       }
     }
   }
@@ -280,6 +290,11 @@ public:
 
       // Skip components that have been disassembled out of view
       if (!c.isVisible)
+        continue;
+
+      // Skip components that are blocked by another component that hasn't been
+      // removed
+      if (!c.blockedBy.empty() && !c.blockerRemoved)
         continue;
 
       // Use slightly larger detection radius for easier hovering

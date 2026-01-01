@@ -113,6 +113,12 @@ void renderScene() {
     tooltipSystem.updateComponent("Hard Disk", 8.0f + hddOff.x,
                                   3.86f + hddOff.y, -3.2f + hddOff.z, hddOff.x);
 
+    // Processor (chipset) position update
+    point3D chipOff = chipset_.getOffset();
+    tooltipSystem.updateComponent("Processor", 8.0f + chipOff.x,
+                                  4.77f + chipOff.y, -4.7f + chipOff.z,
+                                  chipOff.x);
+
     // Draw tooltips on top of the CPU view
     tooltipSystem.draw((float)x, 5.0f, (float)z);
   } else if (page == 0) {
@@ -140,6 +146,10 @@ void opengl_init(void) {
                                   7.746f, 4.841f, -4.566f, 0.5f);
   tooltipSystem.registerComponent("DDR4 RAM", "16GB 3200MHz", 8.0f, 4.8f, -4.3f,
                                   0.4f);
+  // Processor is behind the fan - only show label after fan is removed
+  // Position: glTranslatef(8., 4.77, -4.7) in cpu_chipset.h
+  tooltipSystem.registerComponent("Processor", "Intel Core i7 CPU", 8.0f, 4.77f,
+                                  -4.7f, 0.3f, "CPU Cooling Unit");
   // New Components
   tooltipSystem.registerComponent("Power Supply", "750W Gold Rated", 8.0f, 3.4f,
                                   -4.79f, 0.6f);
